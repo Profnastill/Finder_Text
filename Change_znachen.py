@@ -1,7 +1,5 @@
 # Программа для замены жесткостей в Лире САПР
 # Таблица должна содержать Столбец с названием: "Название";"G"
-
-
 import pandas as pd
 import xlwings as xw
 import re
@@ -18,8 +16,9 @@ if __name__ == '__main__':
     table=table.reset_index()
     pattern="\d{3,}"
     #pattern = "[-+]?\d+"
-    match=  table["G"].apply(lambda x: re.sub(pattern,r"A",x))
-    table = table["G"].apply(lambda x: re.sub(pattern, str(int(re.findall(pattern, x)[0])/100), x))
+    #match=  table["G"].apply(lambda x: re.sub(pattern,r"A",x))
+    #table = table["G"].apply(lambda x: re.sub(pattern, str(int(re.findall(pattern, x)[0])/100), x))#Понижение значения в 100 раз
+    table = table["G"].apply(lambda x: re.sub(pattern, str(0),x))#Обнуление значения
     print(table)
     xlsheet = sheet
-    xlsheet.range("C1").options(index=False).value = table
+    xlsheet.range("G1").options(index=False).value = table
