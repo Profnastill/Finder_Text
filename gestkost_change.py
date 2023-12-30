@@ -8,7 +8,7 @@
 import pandas as pd
 import xlwings as xw
 import re
-pd.options.display.max_rows = 20
+pd.options.display.max_rows = 10
 pd.options.display.max_columns = 100
 pd.set_option('expand_frame_repr', False)
 
@@ -34,8 +34,9 @@ def fun_un_table(sheet_name):
     return new_table1
 
 
-def fun_Perebor():
+def fun_Perebor(table_change, table_base, pred_l, rastoinie_z):
     """
+    rast_zad-аданное расстояние между сваями (допустимое)
     Функция перебора точек по координатам
     :return:
     """
@@ -49,37 +50,39 @@ def fun_Perebor():
             table_change.loc[i, "Test_rast"] = rast
             list_rast.append(rast)
             table_change.loc[i, "Test_rast"] = min(list_rast)  # Нахождение минимального расстояния от одной точки до другой
-            coeff_heigt = 2  # Разность координаты
-            if rast < 1 and table_change.loc[i, "z"] == table_base.loc[k, "z"] + coeff_heigt:
+            coeff_heigt = rastoinie_z  # Разность координаты
+            if rast < pred_l and table_change.loc[i, "z"] == table_base.loc[k, "z"] + coeff_heigt:
                 table_change.loc[i, "Значение жесткостей"] = table_base.loc[k, "Значение жесткостей"]
+                table_change.loc[i, "Наименование"] = table_base.loc[k, "Наименование"]
                 table_change.loc[i, "Жесткость"] = table_base.loc[k, "Жесткость"]
                 table_change.loc[i, "Цвет"] = table_base.loc[k, "Цвет"]
                 break
             else:
                 table_change.loc[i, "Значение жесткостей"] = "None"
 
-if __name__ == '__main__':
-    book = xw.books
-    book = book.active
-    #sheet=sheet.active
-    #sheet_base = book.sheets["Base s1(Mor)"]#Таблица на которую меняем
-    sheet_base = book.sheets["Base s1(Mor) full"]  # Таблица на которую меняем
-    sheet_change = book.sheets["change s1(Mor)full"]# Изменяемая таблица исходная
-
-    #sheet_change = book.sheets["change s1(Mor)"]  # Изменяемая таблица исходная
-    #sheet_base = book.sheets["Base s1(HSL)"]#Таблица на которую меняем
-    #sheet_change = book.sheets["change s1(HSL)"]# Изменяемая таблица исходная
+def fun_start(base_name, change_name, pred_l, rastoinie_z):
+    print(base_name,change_name)
+    """
+    base_name таблица на которую происходит замена
+    change_name- таблица изменяемая 
+    pred_l- расстояние между сваями по горизонтали допустимое
+    rastoinie_z- расстояние между сваями по вертикали допустимое
+    Функция управления программой
+    :return:
+    """
+    sheet_base = book.sheets[base_name]  # Таблица на которую меняем
+    sheet_change = book.sheets[change_name]# Изменяемая таблица исходная
     table_base=fun_un_table(sheet_base)
     table_base["z"] = table_base["z"].apply(lambda x: round(x, 2))
     table_change=fun_un_table(sheet_change)
     #table_change=table_change.drop(["Наименование","Жесткость"],axis=1)
     table_change["z"]=table_change["z"].apply(lambda x: round(x,2))
-    print(table_change)
-    print(table_base)
+    print(f"Table chanhge \n {table_change} \n----")
+    print(f"Table base \n {table_base} ")
     print(f"Проверка длины таблицы исходной{len(table_change)}")
     print(f"Проверка длины таблицы base {len(table_base)}")
     table_change["Test_rast"] = (pow(((table_change["x"] - table_base["x"]) ** 2) + ((table_change["y"] - table_base["y"]) ** 2), 0.5))
-    fun_Perebor()#Функция перебора
+    fun_Perebor(table_change, table_base, pred_l, rastoinie_z)#Функция перебора
     table_change=table_change.sort_values(by=["Наименование"]).reset_index()
 
     table_change=table_change.drop(["index","кэ_x"],axis=1)
@@ -91,6 +94,18 @@ if __name__ == '__main__':
     xlsheet2.range("S1").options(index=False).value = table_base#Вставка Базовая таблица на которую меняем значения
     xlsheet.range("S1").options(index=False).value = table_change#вставка Исходная
     print("Успешно")
+
+
+
+if __name__ == '__main__':
+    book = xw.books
+    book = book.active
+    sheet_param=book.sheets["Parameter"]# Таблица с параметрами для работы программы
+    table_param:pd.DataFrame
+    table_param = sheet_param.range("A1").options(pd.DataFrame, expand='table', index_col=True).value
+    table_param = table_param.reset_index()
+    print(table_param)
+    table_param=table_param.apply(lambda x:fun_start(x["New_shema"],x["Ishodnay_shema"],x["Pred_L"],x["Rastoinie_z"]),axis=1)
 
 
 
