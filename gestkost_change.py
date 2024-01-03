@@ -7,7 +7,8 @@
 
 import pandas as pd
 import xlwings as xw
-import re
+
+
 pd.options.display.max_rows = 10
 pd.options.display.max_columns = 100
 pd.set_option('expand_frame_repr', False)
