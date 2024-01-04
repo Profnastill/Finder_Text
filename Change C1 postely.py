@@ -3,6 +3,8 @@
 
 import pandas as pd
 import xlwings as xw
+import threading
+import asyncio
 
 import numpy as np
 from shapely.geometry import Point, Polygon
@@ -12,22 +14,6 @@ pd.options.display.max_rows = 50
 pd.options.display.max_columns = 100
 pd.set_option('expand_frame_repr', False)
 
-
-def inPolygon(x, y, koordinate_poly):
-    """
-    print(inPolygon(100, 0, (-100, 100, 100, -100), (100, 100, -100, -100)))
-    :param x:
-    :param y:
-    :param koordinate_poly:
-    :return:
-    """
-    c = 0
-    xp = koordinate_poly[0:len(koordinate_poly):2]
-    yp = koordinate_poly[1:len(koordinate_poly):2]
-    for i in range(len(xp)):
-        if (((yp[i] <= y and y < yp[i - 1]) or (yp[i - 1] <= y and y < yp[i])) and
-                (x > (xp[i - 1] - xp[i]) * (y - yp[i]) / (yp[i - 1] - yp[i]) + xp[i])): c = 1 - c
-    return c
 
 def fun_Skleyka(table_elemet_uzel: pd.DataFrame, table_uzel_coordinat: pd.DataFrame):
     """
@@ -49,7 +35,6 @@ def fun_Skleyka(table_elemet_uzel: pd.DataFrame, table_uzel_coordinat: pd.DataFr
         a += 1
     return table_elemet_uzel
 
-
 def is_point_inside(point: list, triangle: list):
     """
     Функция детерминант находит лежит ли точка внутри треугольника
@@ -67,7 +52,6 @@ def is_point_inside(point: list, triangle: list):
     print((det_p1 >= 0 and det_p2 >= 0 and det_p3 >= 0))
     return (det_p1 >= 0 and det_p2 >= 0 and det_p3 >= 0) or (det_p1 <= 0 and det_p2 <= 0 and det_p3 <= 0) and (
             det_triangle == det_p1 + det_p2 + det_p3)
-
 
 def fun_un_table(sheet_name):
     """
@@ -105,7 +89,7 @@ def fun_un_table(sheet_name):
     return table
 
 
-def fun_refind_point(x, y, table: pd.DataFrame):
+def fun_refind_point_OLD(x, y, table: pd.DataFrame):#Старая функция
     """
     Функция перебора точек в таблице базовой и новой, для соотнощения координат попаданий в треугольники
     :param x:
@@ -143,19 +127,19 @@ def find_point_poly(point_coord, polygon: list):
     :param polygon: список с координатами точкее [x1,y1,x2,y2,x3,y3]
     :return:
     """
-    print("-----point \n", point_coord)
-    print("-----polygon\n", polygon)
-    print([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
+    #print("-----point \n", point_coord)
+    #print("-----polygon\n", polygon)
+    #print([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
     poly = Polygon([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
-    print(poly.area)
+    #print(poly.area)
     pt1 = Point(point_coord)  # создаем объект точка
-    intersect = area2.intersection(pt1)
+    intersect = poly.intersection(pt1)
     if pt1 == intersect:
         # breakpoint()
-        print(True, pt1, intersect)
+        #print(True, pt1, intersect)
         return (True)
     else:
-        print(False, pt1, intersect)
+        #print(False, pt1, intersect)
         return False
 
     # array([ True, False, False])
@@ -177,53 +161,42 @@ if __name__ == '__main__':
     print(l, x)
     trt = base_table.apply(lambda row2: [[row2.x_1, row2.y_1], [row2.x_2, row2.y_2], [row2.x_3, row2.y_3]], axis=1)
 
+    #e1=threading.Event()
+    #e2 = threading.Event()
+    #e3 = threading.Event()
 
-    def _new():
-        """
-        перебор но не рабочая
-        :return:
-        """
-        for i in range(len(base_table)):
-            # print(base_table[["x_1","y_1","x_2","y_2","x_3","y_3"]].iloc[i].tolist())
-            koord_treug = base_table[["x_1", "y_1", "x_2", "y_2", "x_3", "y_3"]].iloc[i].tolist()
+    async def event1(task):
+        print(task)
+        await asyncio.sleep(0)
+        change_table["C1z_new1"] = change_table.apply(lambda row: fun_refind_point2(row.x_1, row.y_1, base_table), axis=1)
+    async def event2(task):
+        print(task)
+        await asyncio.sleep(0)
+        change_table["C1z_new2"] = change_table.apply(lambda row: fun_refind_point2(row.x_2, row.y_2, base_table), axis=1)
+    async def event3(task):
+        print(task)
+        await asyncio.sleep(0)
+        change_table["C1z_new3"] = change_table.apply(lambda row: fun_refind_point2(row.x_3, row.y_3, base_table), axis=1)
 
-            print(base_table["C1z"])
-            change_table["Test"] = change_table.apply(
-                lambda row: base_table.C1z.iloc[i] if (is_point_inside([row.x_1, row.y_1], koord_treug)) else False,
-                axis=1)
+    async def main():
 
-            change_table["Test"] = change_table.apply(
-                lambda row: base_table.C1z.iloc[i] if (is_point_inside([row.x_1, row.y_1], koord_treug)) else False,
-                axis=1)
-            """"
-            Пробегаем по каждой точке таблицы change_table, если точка лежит выносим значение
-            
-            """
+        taskA = loop.create_task(event1('taskA'))
+        taskB = loop.create_task(event2('taskB'))
+        taskC = loop.create_task(event3('taskC'))
 
+        #taskA = loop.create_task(event1('taskA'))
+        #taskB = loop.create_task(event2('taskB'))
+        #taskC = loop.create_task(event3('taskC'))
+        await asyncio.sleep(0.5)
 
-    from shapely import Polygon
+    try:
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(main())
+        loop.close()
 
-    area1 = Polygon([(0, 0), (3, 0), (3, 3), (0, 3), (0, 0)])
-    area2 = Polygon([(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)])
-    area3 = Polygon([(1, 1), (2, 1), (2, 2), (1, 2), (1, 1)])
-    print(area1.contains(area2))
-    # breakpoint()
+    except:
+        pass
 
-    for i in range(len(base_table)):  # для старой таблицы
-        old_coord_list = base_table[["x_1", "y_1", "x_2", "y_2", "x_3", "y_3"]].iloc[i].tolist()
-
-        change_table["C1z_new1"]=change_table.apply(lambda row:find_point_poly(find_point_poly([row.x_1,row.y_1],old_coord_list)),axis=1)
-
-    print(change_table)
-
-    breakpoint()
-    change_table["C1z_new1"] = change_table.apply(lambda row: fun_refind_point2(row.x_1, row.y_1, base_table), axis=1)
-    change_table["C1z_new2"] = change_table.apply(lambda row: fun_refind_point2(row.x_2, row.y_2, base_table), axis=1)
-    change_table["C1z_new3"] = change_table.apply(lambda row: fun_refind_point2(row.x_3, row.y_3, base_table), axis=1)
-
-    # change_table["C1z_new1"]=change_table.apply(lambda row:  fun_refind_point(row.x_1, row.y_1, base_table), axis=1)
-    # change_table["C1z_new2"] = change_table.apply(lambda row: fun_refind_point(row.x_2, row.y_2, base_table), axis=1)
-    # change_table["C1z_new3"] = change_table.apply(lambda row: fun_refind_point(row.x_3, row.y_3, base_table), axis=1)
 
     print(change_table[["C1z_new1", "C1z_new2", "C1z_new3"]])
     change_table = change_table.reset_index()
