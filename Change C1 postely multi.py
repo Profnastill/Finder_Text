@@ -1,10 +1,12 @@
 # Программа замены коэффициента постели в пластинах
+import multiprocessing
+
+# Мультипроцессор
 
 
 import pandas as pd
 import xlwings as xw
-import threading
-import asyncio
+from multiprocessing import Process,Pool
 import time
 from tqdm import tqdm
 
@@ -90,21 +92,6 @@ def fun_un_table(sheet_name):
 
     return table
 
-
-def fun_refind_point_OLD(x, y, table: pd.DataFrame):#Старая функция
-    """
-    Функция перебора точек в таблице базовой и новой, для соотнощения координат попаданий в треугольники
-    :param x:
-    :param y:
-    :param table:
-    :return:
-    """
-    for i in range(len(table)):  # для старой таблицы
-        if is_point_inside([x, y], table[["x_1", "y_1", "x_2", "y_2", "x_3", "y_3"]].iloc[i].tolist()):
-            return float(table.C1z.iloc[i])
-    return None
-
-
 def fun_refind_point2(x, y, table: pd.DataFrame):
     """
     Функция перебора точек в таблице базовой и новой, для соотнощения координат попаданий в треугольники
@@ -119,7 +106,6 @@ def fun_refind_point2(x, y, table: pd.DataFrame):
         if find_point_poly(point_coord=[x, y], polygon=old_coord_list):
             return float(table.C1z.iloc[i])
     return None
-
 
 def find_point_poly(point_coord, polygon: list):
     """
@@ -146,71 +132,108 @@ def find_point_poly(point_coord, polygon: list):
         return False
 
 
+class SboRka:
+    def __init__(self,change_table:pd.DataFrame,base_table:pd.DataFrame):
+        self.change_table=change_table
+        self.base_table=base_table
+    def one_proc_main(self):
+        """
+        Старое
+        :return:
+        """
+        self.change_table["C1z_new1"] = self.event1("task1", "x_1", "y_1")
+        self.change_table["C1z_new2"] = self.event1("task2", "x_2", "y_2")
+        self.change_table["C1z_new3"] = self.event1("task3", "x_3", "y_3")
+
+    def event(self,task,change_name,x,y):
+        """
+        Функция перебора
+    
+        :param task: 
+        :param x: Координата
+        :param y:  Координата
+        :return: столбец дата фрейма
+
+        """
+        print(task)
+        self.change_table[change_name] = self.change_table.progress_apply(lambda row: fun_refind_point2(row[x], row[y], self.base_table), axis=1)
+        print(self.change_table)
+        return self.change_table
+
+    def main(self):
+        """
+        Многопроцессорность
+        Реализация через Process
+        :return:
+        """
+        # event1("task1")
+        # event2("task2")
+        # event3("task3")
+        print("старт мультипроцессора")
+        process1 = Process(target=self.event, args=("task1","C1z_new1", "x_1", "y_1",))
+        process2 = Process(target=self.event, args=("task2","C1z_new2", "x_2", "y_2",))
+        process3 = Process(target=self.event, args=("task3","C1z_new3", "x_3", "y_3",))
+        process1.start()
+        process2.start()
+        process3.start()
+
+        process1.join()
+        process2.join()
+        process3.join()
+        print("f-----fff\n",self.change_table)
+    def main_Pool(self):
+        """
+        Многопроцессорность
+        Реализация через pool  полностью рабочая
+        :return:
+        """
+        pool=Pool(4)
+        process1 = pool.apply_async(self.event,("task1","C1z_new1", "x_1", "y_1",))
+        process2 = pool.apply_async(self.event, ("task2","C1z_new2", "x_2", "y_2",))
+        process3 = pool.apply_async(self.event, ("task3","C1z_new3", "x_3", "y_3",))
+        process4 = pool.apply_async(self.event, ("task4", "C1z_new4", "x_4", "y_4",))
+        pool.close()
+        pool.join()
+        self.change_table=pd.concat([process1.get(),process2.get()["C1z_new2"],process3.get()["C1z_new3"]],axis=1)
+        #print(f"jghkdhgkd\n{process1.get()}\n {process2.get()}\n {process3.get()}")
+
+    def insert_to_excel(self):
+        print(self.change_table[["C1z_new1", "C1z_new2", "C1z_new3"]])
+        self.change_table = self.change_table.reset_index()
+        self.change_table["C1z_newwddd"] = self.change_table.loc[:, ["C1z_new1", "C1z_new2", "C1z_new3"]].mean(skipna=True,axis=1)
+        print(self.change_table)
+        # change_table=change_table.query("C1z_new!=False")
+        print(self.change_table)
+        sheet_change.range("R1").options(
+            index=False).value = self.change_table  # Вставка Базовая таблица на которую меняем значения
+
+
+
+base_name = "С1 HSL "
+change_name = "С1 HSL  change"
+book = xw.books
+book = book.active
+table_param: pd.DataFrame
+sheet_base = book.sheets[base_name]  # Таблица на которую меняем
+sheet_change = book.sheets[change_name]  # Таблица на которую меняем
+base_table: pd.DataFrame
+change_table: pd.DataFrame
+base_table = fun_un_table(sheet_base)
+change_table = fun_un_table(sheet_change)
+tqdm.pandas(desc="power DataFrame 1M to 100 random int!")
+
+
+
 if __name__ == '__main__':
-    base_name = "С1 HSL "
-    change_name = "С1 HSL  change"
-    book = xw.books
-    book = book.active
-    table_param: pd.DataFrame
-    sheet_base = book.sheets[base_name]  # Таблица на которую меняем
-    sheet_change = book.sheets[change_name]  # Таблица на которую меняем
-    base_table: pd.DataFrame
-    change_table: pd.DataFrame
-    base_table = fun_un_table(sheet_base)
-    change_table = fun_un_table(sheet_change)
-    l, x = [0, 3]
-    print(l, x)
-
-    async def event1(task):
-        print(task)
-        print("-1")
-        #await asyncio.sleep(0)
-        change_table["C1z_new1"] = await  change_table.progress_apply(lambda row: fun_refind_point2(row.x_1, row.y_1, base_table), axis=1)
-
-    async def event2(task):
-        print(task)
-        print("-2")
-        change_table["C1z_new2"] = await change_table.progress_apply(lambda row: fun_refind_point2(row.x_2, row.y_2, base_table), axis=1)
-
-    async def event3(task):
-        print(task)
-
-        change_table["C1z_new3"] = await change_table.progress_apply(lambda row: fun_refind_point2(row.x_3, row.y_3, base_table), axis=1)
-
-    async def event4(task):
-        print(task)
-        #await asyncio.sleep(0)
-        change_table["C1z_new3"] = await change_table.progress_apply(lambda row: fun_refind_point2(row.x_4, row.y_4, base_table), axis=1)
+    n_cores=4
+    # with multiprocessing.Pool(4) as p:
+    #     rezults=p.map(main())
+    # main()
+    # insert_to_excel()
+    a=SboRka(change_table,base_table)
+    # a.main()
+    a.main_Pool()
+    print(a.change_table)
+    a.insert_to_excel()
 
 
-    tqdm.pandas(desc="power DataFrame 1M to 100 random int!")
-    async def main():
-        taskA = asyncio.create_task(event1('taskA'))
-        taskB = asyncio.create_task(event2('taskB'))
-        taskC = asyncio.create_task(event3('taskC'))
-
-        #taskA = loop.create_task(event1('taskA'))
-        #taskB = loop.create_task(event2('taskB'))
-        #taskC = loop.create_task(event3('taskC'))
-        await taskA
-        await taskB
-        await taskC
-
-    try:
-        loop = asyncio.run(main())
-        #loop.run_until_complete(main())
-        loop.close()
-
-    except:
-        pass
-
-
-    print(change_table[["C1z_new1", "C1z_new2", "C1z_new3"]])
-    change_table = change_table.reset_index()
-    change_table["C1z_newwddd"] = change_table.loc[:, ["C1z_new1", "C1z_new2", "C1z_new3"]].mean(skipna=True, axis=1)
-
-    print(change_table)
-    # change_table=change_table.query("C1z_new!=False")
-    print(change_table)
-    sheet_change.range("R1").options(
-        index=False).value = change_table  # Вставка Базовая таблица на которую меняем значения
