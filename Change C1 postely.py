@@ -147,7 +147,7 @@ def find_point_poly(point_coord, polygon: list):
 
 
 if __name__ == '__main__':
-    base_name = "С1 HSL "
+    base_name = "С1 HSL"
     change_name = "С1 HSL  change"
     book = xw.books
     book = book.active

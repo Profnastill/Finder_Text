@@ -156,6 +156,9 @@ class SboRka:
 
         """
         print(task)
+        sheet_change:pd.DataFrame
+        self.change_table=self.change_table.sort_values(by=[x,y])
+        self.base_table = self.base_table.sort_values(by=[x, y])
         self.change_table[change_name] = self.change_table.progress_apply(lambda row: fun_refind_point2(row[x], row[y], self.base_table), axis=1)
         print(self.change_table)
         return self.change_table
@@ -209,8 +212,9 @@ class SboRka:
 
 
 
-base_name = "С1 HSL "
-change_name = "С1 HSL  change"
+base_name = "С1 HSL"# Таблица на которую меняем
+change_name = "С1 HSL  change"# Таблица которую будем менять
+
 book = xw.books
 book = book.active
 table_param: pd.DataFrame
