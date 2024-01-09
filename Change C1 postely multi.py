@@ -101,8 +101,8 @@ def fun_refind_point2(x, y, table: pd.DataFrame):
     :return:
     """
 
-    for i in range(len(table)):  # для старой таблицы
-        old_coord_list = table[["x_1", "y_1", "x_2", "y_2", "x_3", "y_3"]].iloc[i].tolist()
+    for i, row in table.iterrows():  # для старой таблицы
+        old_coord_list = table[["x_1", "y_1", "x_2", "y_2", "x_3", "y_3","x_4","y_4"]].iloc[i].tolist()
         if find_point_poly(point_coord=[x, y], polygon=old_coord_list):
             return float(table.C1z.iloc[i])
     return None
@@ -116,10 +116,10 @@ def find_point_poly(point_coord, polygon: list):
     :param polygon: список с координатами точкее [x1,y1,x2,y2,x3,y3]
     :return:
     """
-    #print("-----point \n", point_coord)
-    #print("-----polygon\n", polygon)
-    #print([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
-    poly = Polygon([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
+    if pd.isnull(polygon[6]):
+        poly = Polygon([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5])])
+    else:
+        poly = Polygon([(polygon[0], polygon[1]), (polygon[2], polygon[3]), (polygon[4], polygon[5]),(polygon[6], polygon[7])])
     #print(poly.area)
     pt1 = Point(point_coord)  # создаем объект точка
     intersect = poly.intersection(pt1)
@@ -141,9 +141,9 @@ class SboRka:
         Старое
         :return:
         """
-        self.change_table["C1z_new1"] = self.event1("task1", "x_1", "y_1")
-        self.change_table["C1z_new2"] = self.event1("task2", "x_2", "y_2")
-        self.change_table["C1z_new3"] = self.event1("task3", "x_3", "y_3")
+        self.change_table["C1z_new1"] = self.event("task1", "x_1", "y_1")
+        self.change_table["C1z_new2"] = self.event("task2", "x_2", "y_2")
+        self.change_table["C1z_new3"] = self.event("task3", "x_3", "y_3")
 
     def event(self,task,change_name,x,y):
         """
@@ -197,13 +197,17 @@ class SboRka:
         process4 = pool.apply_async(self.event, ("task4", "C1z_new4", "x_4", "y_4",))
         pool.close()
         pool.join()
-        self.change_table=pd.concat([process1.get(),process2.get()["C1z_new2"],process3.get()["C1z_new3"]],axis=1)
+        self.change_table=pd.concat([process1.get(),process2.get()["C1z_new2"],process3.get()["C1z_new3"],process4.get()["C1z_new4"]],axis=1)
         #print(f"jghkdhgkd\n{process1.get()}\n {process2.get()}\n {process3.get()}")
 
     def insert_to_excel(self):
-        print(self.change_table[["C1z_new1", "C1z_new2", "C1z_new3"]])
+        print(self.change_table[["C1z_new1", "C1z_new2", "C1z_new3","C1z_new4"]])
         self.change_table = self.change_table.reset_index()
-        self.change_table["C1z_newwddd"] = self.change_table.loc[:, ["C1z_new1", "C1z_new2", "C1z_new3"]].mean(skipna=True,axis=1)
+        filter1=self.change_table.query('y_4!=y_4')#Находим значение c Nan
+        filter2=self.change_table.query('y_4==y_4')#Находим остальные значения
+        filter1.loc[:,"C1z_new4"]=np.NAN
+        self.change_table=pd.concat([filter1,filter2],axis=0)
+        self.change_table["C1z_mean"] = self.change_table.loc[:, ["C1z_new1", "C1z_new2", "C1z_new3","C1z_new4"]].mean(skipna=True,axis=1)
         print(self.change_table)
         # change_table=change_table.query("C1z_new!=False")
         print(self.change_table)
